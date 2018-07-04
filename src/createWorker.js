@@ -1,75 +1,64 @@
-const createWorker = (reducer) => {
-	// Initialize ReduxWorekr
-	let worker = new ReduxWorker();
-	
-	let messageHandler = (e) => {
-		var action = e.data;
+/* eslint-disable no-restricted-globals */
 
-		if (typeof action.type === 'string') {
-			if (!worker.reducer || typeof worker.reducer !== 'function') {
-				throw new Error('Expect reducer to be function. Have you registerReducer yet?');
-			}
+import ReduxWebWorker from './ReduxWebWorker';
 
-			// Set new state
-			let state = worker.state;
-			state = worker.state = worker.reducer(state, action);
-			state = worker.transform(state);
+/**
+ * Creates a new redux web worker.
+ * @return {ReduxWebWorker}
+ */
+function createWorker() {
+  const worker = new ReduxWebWorker();
 
-			// Send new state to main thread
-			self.postMessage({
-				type: action.type,
-				state: state,
-				action: action
-			});
+  /**
+   * Handles worker messages.
+   * @param {Object} event The worker message event.
+   */
+  function messageHandler(event) {
+    const action = event.data;
 
-			return;
-		}
+    if (typeof action.type === 'string') {
+      if (!worker.reducer || typeof worker.reducer !== 'function') {
+        throw new Error('Expect reducer to of type function.');
+      }
 
-		if (typeof action.task === 'string' && typeof action._taskId === 'number') {
-			let taskRunner = worker.tasks[ action.task ];
+      // Set a new state.
+      /* eslint-disable no-multi-assign, prefer-destructuring */
+      let state = worker.state;
+      state = worker.state = worker.reducer(state, action);
+      state = worker.transform(state);
+      /* eslint-enable no-multi-assign, prefer-destructuring */
 
-			if (!taskRunner || typeof taskRunner !== 'function') {
-				throw new Error('Cannot find runner for task ' + action.task + '. Have you registerTask yet?');
-			}
+      // Send the new state to the main thread.
+      self.postMessage({
+        type: action.type,
+        state,
+        action,
+      });
 
-			// Send new state to main thread
-			self.postMessage({
-				_taskId: action._taskId,
-				response: taskRunner(action)
-			});
-		}
-	}
+      return;
+    }
 
-	worker.destroy = () => {
-		self.removeEventListener('message', messageHandler);
-	}
+    if (typeof action.task === 'string' && typeof action.taskId === 'number') {
+      const taskRunner = worker.tasks.get(action.task);
 
-	self.addEventListener('message', messageHandler);
+      if (!taskRunner || typeof taskRunner !== 'function') {
+        throw new Error(`Cannot find runner for task ${action.task}.`);
+      }
 
+      self.postMessage({
+        taskId: action.taskId,
+        response: taskRunner(action),
+      });
+    }
+  }
 
-	return worker;
+  worker.destroy = () => {
+    self.removeEventListener('message', messageHandler);
+  };
+
+  self.addEventListener('message', messageHandler);
+
+  return worker;
 }
 
-class ReduxWorker {
-	constructor() {
-		// Taskrunners
-		this.tasks = {};
-
-		// Redux-specific variables
-		this.state = {};
-		this.reducer = null;
-		this.transform = function(state) { return state; }
-	}
-
-	registerReducer(reducer, transform) {
-		this.reducer = reducer;
-		this.state = reducer({}, {});
-	}
-
-	registerTask(name, taskFn) {
-		this.tasks[ name ] = taskFn;
-	}
-
-}
-
-export default createWorker
+export default createWorker;
