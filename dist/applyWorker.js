@@ -16,6 +16,7 @@
   Object.defineProperty(exports, "__esModule", {
     value: true
   });
+
   function defer() {
     var result = {};
 
@@ -27,20 +28,21 @@
     return result;
   }
 
-  var applyWorker = function applyWorker(worker) {
+  function replacementReducer(state, action) {
+    if (action.state) {
+      return action.state;
+    }
+
+    return state;
+  }
+
+  function applyWorker(worker) {
     return function (createStore) {
       return function (reducer, initialState, enhancer) {
         if (!(worker instanceof Worker)) {
           console.error('Expect input to be a Web Worker. Fall back to normal store.');
           return createStore(reducer, initialState, enhancer);
         }
-
-        var replacementReducer = function replacementReducer(state, action) {
-          if (action.state) {
-            return action.state;
-          }
-          return state;
-        };
 
         var taskId = 0;
         var taskCompleteCallbacks = {};
@@ -73,8 +75,9 @@
 
         store.isWorker = true;
 
-        worker.addEventListener('message', function (e) {
-          var action = e.data;
+        worker.addEventListener('message', function (event) {
+          var action = event.data;
+
           if (typeof action.type === 'string') {
             next(action);
           }
@@ -92,7 +95,7 @@
         return store;
       };
     };
-  };
+  }
 
   exports.default = applyWorker;
 });

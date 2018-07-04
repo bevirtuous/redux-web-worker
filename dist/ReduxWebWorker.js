@@ -63,7 +63,9 @@
     }, {
       key: "registerTask",
       value: function registerTask(name, taskFn) {
-        this.tasks.set(name, taskFn);
+        if (!this.tasks.has(name)) {
+          this.tasks.set(name, taskFn);
+        }
       }
     }]);
 
