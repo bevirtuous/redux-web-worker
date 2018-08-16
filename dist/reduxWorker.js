@@ -8,7 +8,7 @@
       exports: {}
     };
     factory(mod.exports, global.createWorker, global.applyWorker);
-    global.index = mod.exports;
+    global.reduxWorker = mod.exports;
   }
 })(this, function (exports, _createWorker, _applyWorker) {
   'use strict';

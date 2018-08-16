@@ -1,39 +1,55 @@
 (function (global, factory) {
   if (typeof define === "function" && define.amd) {
-    define(['exports', './ReduxWebWorker'], factory);
+    define(['exports'], factory);
   } else if (typeof exports !== "undefined") {
-    factory(exports, require('./ReduxWebWorker'));
+    factory(exports);
   } else {
     var mod = {
       exports: {}
     };
-    factory(mod.exports, global.ReduxWebWorker);
+    factory(mod.exports);
     global.createWorker = mod.exports;
   }
-})(this, function (exports, _ReduxWebWorker) {
+})(this, function (exports) {
   'use strict';
 
   Object.defineProperty(exports, "__esModule", {
     value: true
   });
 
-  var _ReduxWebWorker2 = _interopRequireDefault(_ReduxWebWorker);
-
-  function _interopRequireDefault(obj) {
-    return obj && obj.__esModule ? obj : {
-      default: obj
-    };
+  function _classCallCheck(instance, Constructor) {
+    if (!(instance instanceof Constructor)) {
+      throw new TypeError("Cannot call a class as a function");
+    }
   }
 
-  function createWorker() {
-    var worker = new _ReduxWebWorker2.default();
+  var _createClass = function () {
+    function defineProperties(target, props) {
+      for (var i = 0; i < props.length; i++) {
+        var descriptor = props[i];
+        descriptor.enumerable = descriptor.enumerable || false;
+        descriptor.configurable = true;
+        if ("value" in descriptor) descriptor.writable = true;
+        Object.defineProperty(target, descriptor.key, descriptor);
+      }
+    }
 
-    function messageHandler(event) {
-      var action = event.data;
+    return function (Constructor, protoProps, staticProps) {
+      if (protoProps) defineProperties(Constructor.prototype, protoProps);
+      if (staticProps) defineProperties(Constructor, staticProps);
+      return Constructor;
+    };
+  }();
+
+  var createWorker = function createWorker(reducer) {
+    var worker = new ReduxWorker();
+
+    var messageHandler = function messageHandler(e) {
+      var action = e.data;
 
       if (typeof action.type === 'string') {
         if (!worker.reducer || typeof worker.reducer !== 'function') {
-          throw new Error('Expect reducer to of type function.');
+          throw new Error('Expect reducer to be function. Have you registerReducer yet?');
         }
 
         var state = worker.state;
@@ -49,19 +65,19 @@
         return;
       }
 
-      if (typeof action.task === 'string' && typeof action.taskId === 'number') {
-        var taskRunner = worker.tasks.get(action.task);
+      if (typeof action.task === 'string' && typeof action._taskId === 'number') {
+        var taskRunner = worker.tasks[action.task];
 
         if (!taskRunner || typeof taskRunner !== 'function') {
-          throw new Error('Cannot find runner for task ' + action.task + '.');
+          throw new Error('Cannot find runner for task ' + action.task + '. Have you registerTask yet?');
         }
 
         self.postMessage({
-          taskId: action.taskId,
+          _taskId: action._taskId,
           response: taskRunner(action)
         });
       }
-    }
+    };
 
     worker.destroy = function () {
       self.removeEventListener('message', messageHandler);
@@ -70,7 +86,36 @@
     self.addEventListener('message', messageHandler);
 
     return worker;
-  }
+  };
+
+  var ReduxWorker = function () {
+    function ReduxWorker() {
+      _classCallCheck(this, ReduxWorker);
+
+      this.tasks = {};
+
+      this.state = {};
+      this.reducer = null;
+      this.transform = function (state) {
+        return state;
+      };
+    }
+
+    _createClass(ReduxWorker, [{
+      key: 'registerReducer',
+      value: function registerReducer(reducer, transform) {
+        this.reducer = reducer;
+        this.state = reducer({}, {});
+      }
+    }, {
+      key: 'registerTask',
+      value: function registerTask(name, taskFn) {
+        this.tasks[name] = taskFn;
+      }
+    }]);
+
+    return ReduxWorker;
+  }();
 
   exports.default = createWorker;
 });

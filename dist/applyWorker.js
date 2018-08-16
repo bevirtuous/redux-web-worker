@@ -16,27 +16,16 @@
   Object.defineProperty(exports, "__esModule", {
     value: true
   });
-
-  function defer() {
+  var defer = function defer() {
     var result = {};
-
     result.promise = new Promise(function (resolve, reject) {
       result.resolve = resolve;
       result.reject = reject;
     });
-
     return result;
-  }
+  };
 
-  function replacementReducer(state, action) {
-    if (action.state) {
-      return action.state;
-    }
-
-    return state;
-  }
-
-  function applyWorker(worker) {
+  var applyWorker = function applyWorker(worker) {
     return function (createStore) {
       return function (reducer, initialState, enhancer) {
         if (!(worker instanceof Worker)) {
@@ -44,10 +33,17 @@
           return createStore(reducer, initialState, enhancer);
         }
 
+        var replacementReducer = function replacementReducer(state, action) {
+          if (action.state) {
+            return Object.assign(state, action.state);
+          }
+          return state;
+        };
+
         var taskId = 0;
         var taskCompleteCallbacks = {};
 
-        var store = createStore(replacementReducer, reducer({}, {}), enhancer);
+        var store = createStore(replacementReducer, initialState, enhancer);
 
         var next = store.dispatch;
 
@@ -63,11 +59,11 @@
           }
 
           if (typeof action.task === 'string') {
-            var task = Object.assign({}, action, { taskId: taskId });
+            var task = Object.assign({}, action, { _taskId: taskId });
             var deferred = defer();
 
             taskCompleteCallbacks[taskId] = deferred;
-            taskId += 1;
+            taskId++;
             worker.postMessage(task);
             return deferred.promise;
           }
@@ -75,19 +71,18 @@
 
         store.isWorker = true;
 
-        worker.addEventListener('message', function (event) {
-          var action = event.data;
-
+        worker.addEventListener('message', function (e) {
+          var action = e.data;
           if (typeof action.type === 'string') {
             next(action);
           }
 
-          if (typeof action.taskId === 'number') {
-            var wrapped = taskCompleteCallbacks[action.taskId];
+          if (typeof action._taskId === 'number') {
+            var wrapped = taskCompleteCallbacks[action._taskId];
 
             if (wrapped) {
               wrapped.resolve(action);
-              delete taskCompleteCallbacks[action.taskId];
+              delete taskCompleteCallbacks[action._taskId];
             }
           }
         });
@@ -95,7 +90,7 @@
         return store;
       };
     };
-  }
+  };
 
   exports.default = applyWorker;
 });
