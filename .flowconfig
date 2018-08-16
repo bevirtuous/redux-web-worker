@@ -1,0 +1,16 @@
+[ignore]
+./flow-typed/.*
+
+[include]
+./src/
+
+[libs]
+
+[lints]
+all=error
+untyped-import=off
+
+[options]
+include_warnings=true
+
+[strict]

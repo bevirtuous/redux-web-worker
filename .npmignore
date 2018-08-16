@@ -1,5 +1,4 @@
 .babelrc
 .eslintrc.js
-webpack.config.js
-demo/
-spec/
+.flowconfig
+/flow-typed/
