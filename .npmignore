@@ -1,4 +1,7 @@
 .babelrc
 .eslintrc.js
 .flowconfig
-/flow-typed/
+.jsconfig.json
+types.js
+flow-typed/
+src/
