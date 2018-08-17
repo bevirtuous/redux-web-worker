@@ -1,96 +1,45 @@
-(function (global, factory) {
-  if (typeof define === "function" && define.amd) {
-    define(['exports'], factory);
-  } else if (typeof exports !== "undefined") {
-    factory(exports);
-  } else {
-    var mod = {
-      exports: {}
-    };
-    factory(mod.exports);
-    global.applyWorker = mod.exports;
-  }
-})(this, function (exports) {
-  'use strict';
+'use strict';
 
-  Object.defineProperty(exports, "__esModule", {
-    value: true
-  });
-  var defer = function defer() {
-    var result = {};
-    result.promise = new Promise(function (resolve, reject) {
-      result.resolve = resolve;
-      result.reject = reject;
-    });
-    return result;
-  };
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.applyWorker = applyWorker;
 
-  var applyWorker = function applyWorker(worker) {
-    return function (createStore) {
-      return function (reducer, initialState, enhancer) {
-        if (!(worker instanceof Worker)) {
-          console.error('Expect input to be a Web Worker. Fall back to normal store.');
-          return createStore(reducer, initialState, enhancer);
+var _logger = require('./logger');
+
+var _workerReducer = require('./workerReducer');
+
+function applyWorker(worker) {
+  return function handleCreateStore(createStore) {
+    return function (reducer, initialState, enhancer) {
+      if (!(worker instanceof Worker)) {
+        _logger.logger.error('Expect input to be a Web Worker. Fall back to normal store.');
+        return createStore(reducer, initialState, enhancer);
+      }
+
+      var store = createStore(_workerReducer.workerReducer, initialState, enhancer);
+      var next = store.dispatch;
+
+      store.dispatch = function (action) {
+        if (!window.Worker || window.disableWebWorker) {
+          next({
+            type: action.type,
+            workerState: reducer(store.getState(), action)
+          });
+
+          return;
         }
 
-        var replacementReducer = function replacementReducer(state, action) {
-          if (action.state) {
-            return Object.assign(state, action.state);
-          }
-          return state;
-        };
-
-        var taskId = 0;
-        var taskCompleteCallbacks = {};
-
-        var store = createStore(replacementReducer, initialState, enhancer);
-
-        var next = store.dispatch;
-
-        store.dispatch = function (action) {
-          if (typeof action.type === 'string') {
-            if (window.disableWebWorker) {
-              return next({
-                type: action.type,
-                state: reducer(store.getState(), action)
-              });
-            }
-            worker.postMessage(action);
-          }
-
-          if (typeof action.task === 'string') {
-            var task = Object.assign({}, action, { _taskId: taskId });
-            var deferred = defer();
-
-            taskCompleteCallbacks[taskId] = deferred;
-            taskId++;
-            worker.postMessage(task);
-            return deferred.promise;
-          }
-        };
-
-        store.isWorker = true;
-
-        worker.addEventListener('message', function (e) {
-          var action = e.data;
-          if (typeof action.type === 'string') {
-            next(action);
-          }
-
-          if (typeof action._taskId === 'number') {
-            var wrapped = taskCompleteCallbacks[action._taskId];
-
-            if (wrapped) {
-              wrapped.resolve(action);
-              delete taskCompleteCallbacks[action._taskId];
-            }
-          }
-        });
-
-        return store;
+        worker.postMessage(JSON.stringify(action));
       };
+
+      worker.addEventListener('message', function (_ref) {
+        var data = _ref.data;
+
+        next(data);
+      });
+
+      return store;
     };
   };
-
-  exports.default = applyWorker;
-});
+}

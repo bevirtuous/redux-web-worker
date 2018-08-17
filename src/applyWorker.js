@@ -1,79 +1,47 @@
-const defer = function () {
-  const result = {};
-  result.promise = new Promise(((resolve, reject) => {
-    result.resolve = resolve;
-    result.reject = reject;
-  }));
-  return result;
-};
+// @flow
+import type { Reducer, StoreEnhancer } from 'redux';
+import { logger } from './logger';
+import { workerReducer } from './workerReducer';
+import type { Action } from '../types';
 
-const applyWorker = worker => createStore => (reducer, initialState, enhancer) => {
-  if (!(worker instanceof Worker)) {
-    console.error('Expect input to be a Web Worker. Fall back to normal store.');
-    return createStore(reducer, initialState, enhancer);
-  }
-
-  // New reducer for workified store
-  const replacementReducer = (state, action) => {
-    if (action.state) {
-      return Object.assign(state, action.state);
-    }
-    return state;
-  };
-
-  // Start task id;
-  let taskId = 0;
-  const taskCompleteCallbacks = {};
-
-  // Create store using new reducer
-  const store = createStore(replacementReducer, initialState, enhancer);
-
-  // Store reference of old dispatcher
-  const next = store.dispatch;
-
-  // Replace dispatcher
-  store.dispatch = (action) => {
-    if (typeof action.type === 'string') {
-      if (window.disableWebWorker) {
-        return next({
-          type: action.type,
-          state: reducer(store.getState(), action),
-        });
+/**
+ * @param {Worker} worker The Worker instance to apply to the redux store.
+ * @return {Function}
+ */
+export function applyWorker(worker: Worker) {
+  return function handleCreateStore(createStore) {
+    return (reducer: Reducer<{}, {}>, initialState: {}, enhancer: StoreEnhancer<{}, {}>) => {
+      if (!(worker instanceof Worker)) {
+        logger.error('Expect input to be a Web Worker. Fall back to normal store.');
+        return createStore(reducer, initialState, enhancer);
       }
-      worker.postMessage(action);
-    }
 
-    if (typeof action.task === 'string') {
-      const task = Object.assign({}, action, { _taskId: taskId });
-      const deferred = defer();
+      const store = createStore(workerReducer, initialState, enhancer);
+      const next = store.dispatch;
 
-      taskCompleteCallbacks[taskId] = deferred;
-      taskId++;
-      worker.postMessage(task);
-      return deferred.promise;
-    }
+      /**
+       * Replace the default dispatch to handle worker postMessages instead.
+       * @param {Object} action The worker redux action.
+       */
+      store.dispatch = (action: Action) => {
+        // If Worker is not available just send out the current state.
+        if (!window.Worker || window.disableWebWorker) {
+          next({
+            type: action.type,
+            workerState: reducer(store.getState(), action),
+          });
+
+          return;
+        }
+
+        worker.postMessage(JSON.stringify(action));
+      };
+
+      worker.addEventListener('message', ({ data }: MessageEvent) => {
+        next(data);
+      });
+
+      return store;
+    };
   };
-
-  store.isWorker = true;
-
-  // Add worker events listener
-  worker.addEventListener('message', (e) => {
-    const action = e.data;
-    if (typeof action.type === 'string') {
-      next(action);
-    }
-
-    if (typeof action._taskId === 'number') {
-      const wrapped = taskCompleteCallbacks[action._taskId];
-
-      if (wrapped) {
-        wrapped.resolve(action);
-        delete taskCompleteCallbacks[action._taskId];
-      }
-    }
-  });
-
-  return store;
-};
-
-export default applyWorker;
+}

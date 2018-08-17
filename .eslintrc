@@ -1,0 +1,17 @@
+{
+  "extends": [
+    "@virtuous/eslint-config",
+    "plugin:flowtype/recommended"
+  ],
+  "globals": {
+    "__": true
+  },
+  "env": {
+    "browser": true,
+    "worker": true
+  },
+  "rules": {
+    "capitalized-comments": 0,
+    "require-jsdoc": 0
+  }
+}
