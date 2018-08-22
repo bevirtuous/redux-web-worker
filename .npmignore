@@ -1,4 +1,5 @@
 .babelrc
+.eslintignore
 .eslintrc.js
 .flowconfig
 .jsconfig.json

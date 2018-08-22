@@ -6,6 +6,7 @@
   "license": "MIT",
   "main": "./dist",
   "scripts": {
+    "start": "nodemon --exec \"yarn run build\"",
     "build": "rm -rf dist/ && BABEL_ENV=production babel src --out-dir dist --no-comments",
     "release": "yarn run build && git add -A",
     "postrelease": "git push && git push --tags && npm publish --access=public",
@@ -23,10 +24,17 @@
     "babel-preset-env": "^1.7.0",
     "babel-preset-flow": "^6.23.0",
     "babel-runtime": "^6.26.0",
+    "eslint-plugin-flowtype": "^2.50.0",
     "flow-bin": "^0.78.0",
+    "nodemon": "^1.18.3",
     "redux": "^4.0.0"
   },
   "peerDependencies": {
     "redux": "3 || 4"
+  },
+  "nodemonConfig": {
+    "ignore": [
+      "dist/*"
+    ]
   }
 }
