@@ -1,6 +1,6 @@
 {
   "name": "@virtuous/redux-web-worker",
-  "version": "1.0.0-beta.3",
+  "version": "1.0.0-beta.4",
   "description": "Moves the redux reducer logic into Web Worker.",
   "author": "Florian Müller <florian.mueller81@gmx.de> (https://github.com/devbucket)",
   "license": "MIT",
